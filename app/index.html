@@ -677,14 +677,24 @@
         return choices;
       };
 
-      // servers reachable by strangers ignore these choices unless told otherwise.
+      // servers reachable by strangers ignore these choices unless told
+      // otherwise; member or not is the player's choice on a server that says
+      // so (membershipChoice), the other account types stay locked there.
+      const MEMBERSHIP_TYPES = ["", "0", "2"];
       const showWhetherChoicesApply = flashVars => {
         const honoured = flashVars.loginChoices !== false;
+        const membership = honoured || flashVars.membershipChoice === true;
         for (const field of document.querySelectorAll("[data-choice]")) {
-          field.disabled = !honoured;
+          field.disabled = field.id === "account-type" ? !membership : !honoured;
+        }
+        for (const option of $("account-type").options) {
+          option.disabled = !honoured && !MEMBERSHIP_TYPES.includes(option.value);
+        }
+        if ($("account-type").selectedOptions[0] && $("account-type").selectedOptions[0].disabled) {
+          $("account-type").value = "";
         }
         $("choices-hint").hidden = honoured;
-        $("choices-hint").textContent = honoured ? "" : "Locked by this server.";
+        $("choices-hint").textContent = honoured ? "" : membership ? "Developer and Guide are locked by this server." : "Locked by this server.";
       };
 
       const getJson = async (url, options) => {
@@ -946,6 +956,7 @@
 
         const gamePort = flashVars.smartfoxPort;
         delete flashVars.loginChoices;
+        delete flashVars.membershipChoice;
         Object.assign(flashVars, {
           smartfoxServer: player.body.game_server || flashVars.smartfoxServer,
           blueboxServer: player.body.game_server || flashVars.blueboxServer,
@@ -1401,7 +1412,6 @@
         if (latest) {
           $("username").value = latest.username;
           $("remember").checked = true;
-          $("password").placeholder = "Remembered: leave empty";
         }
         checkServer();
         // the first answer includes making the connection; the second is the ping.

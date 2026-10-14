@@ -21,6 +21,14 @@ done
 [ -d "$flash" ] || { echo "no flash plugin at $flash (BUILDING.md says where to get it)" >&2; exit 1; }
 
 dist=$here/dist
+
+# what the download page says each installer is: a line each in dist/RELEASES
+# ("Burrow-Setup.exe 1.1.1 2026-10-15"), sent up with the installers
+note_release() {
+  local list=$dist/RELEASES
+  { awk -v file="$1" '$1 != file' "$list" 2>/dev/null || true; echo "$1 $2 $(date -u +%F)"; } > "$list.new"
+  mv "$list.new" "$list"
+}
 work=$(mktemp -d)
 mkdir -p "$dist"
 cd "$work"
@@ -62,3 +70,4 @@ ln -s /Applications image/Applications
 rm -f "$dist/Burrow-macos.dmg"
 hdiutil create -volname Burrow -srcfolder image -ov -format UDZO "$dist/Burrow-macos.dmg"
 shasum -a 256 "$dist/Burrow-macos.dmg"
+note_release Burrow-macos.dmg "$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$here/app/package.json")"

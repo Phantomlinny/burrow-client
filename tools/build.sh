@@ -37,6 +37,14 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 mkdir -p "$dist"
 
+# what the download page says each installer is: a line each in dist/RELEASES
+# ("Burrow-Setup.exe 1.1.1 2026-10-15"), sent up with the installers
+note_release() {
+  local list=$dist/RELEASES
+  { awk -v file="$1" '$1 != file' "$list" 2>/dev/null || true; echo "$1 $2 $(date -u +%F)"; } > "$list.new"
+  mv "$list.new" "$list"
+}
+
 # the app as players get it, with the server's address
 cp -r "$here/app" "$work/app"
 if [ -n "$server" ]; then
@@ -91,6 +99,7 @@ for target in "${targets[@]}"; do
       nsis=$(cd "$here/installer" && node -e 'require("app-builder-lib/out/toolsets/windows.js").getMakeNsisPath().then(r => console.log(r.path))')
       NSISDIR=$(dirname "$(dirname "$nsis")") "$nsis" -V2 -DVERSION="$version" -DSOURCE="$win" -DOUTFILE="$dist/Burrow-Setup.exe" \
         -DICON="$here/tools/icon.ico" -DFILES="$work/files.nsh" "$here/installer/burrow.nsi"
+      note_release Burrow-Setup.exe "$version"
       ;;
     linux)
       need "$here/electron/electron"
@@ -100,6 +109,9 @@ for target in "${targets[@]}"; do
       chmod 755 "$work/electron/electron" "$work/electron/chrome-sandbox"
       builder "$work/electron" --linux --x64
       cp "$work/out/Burrow-x86_64.AppImage" "$work/out/burrow_amd64.deb" "$work/out/burrow.x86_64.rpm" "$dist/"
+      for file in Burrow-x86_64.AppImage burrow_amd64.deb burrow.x86_64.rpm; do
+        note_release "$file" "$version"
+      done
       ;;
   esac
   rm -rf "$work/out"

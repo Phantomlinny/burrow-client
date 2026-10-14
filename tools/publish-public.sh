@@ -7,8 +7,8 @@
 # no markdown file of any kind goes public. the public repository has a
 # history of its own: nothing of this one's
 # history goes there, so a file that was ever committed here and is private
-# never shows up in an old public commit. its .gitignore names the private
-# paths too, so they are not added there by hand either.
+# never shows up in an old public commit. the public repository's own files
+# (its README, .gitignore and licence, written there) are left as they are.
 set -euo pipefail
 
 name=burrow-client
@@ -16,6 +16,9 @@ remote=git@github.com:burrow-dev/$name.git
 # what stays private: nothing beyond what .gitignore keeps out already
 # (Electron, the Flash plugin, the builds)
 private=()
+
+# the public repository's own: never replaced or removed from here
+public_own=(README.md .gitignore LICENSE)
 
 here=$(cd "$(dirname "$0")/.." && pwd)
 public=${BURROW_PUBLIC_DIR:-$HOME/burrow-public/$name}
@@ -56,21 +59,30 @@ if [ -n "$leaked" ]; then
   exit 1
 fi
 
-{
-  cat "$work/.gitignore"
-  printf '\n# kept in the private repository, never here\n'
-  printf '*.md\n'
-  for path in "${private[@]+"${private[@]}"}"; do
-    printf '/%s\n' "$path"
-  done
-} > "$work/.gitignore.public"
-mv "$work/.gitignore.public" "$work/.gitignore"
+rm -f "$work/.gitignore"
 
-# the public tree becomes exactly this
-find "$public" -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+# start from what is on github: changes made there are kept
+if git -C "$public" fetch -q origin main 2>/dev/null; then
+  git -C "$public" reset -q --hard origin/main
+fi
+
+# the public tree becomes exactly this, beside the public repository's own
+keep=(! -name .git)
+for name in "${public_own[@]}"; do
+  keep+=(! -name "$name")
+  rm -rf "${work:?}/$name"
+done
+find "$public" -mindepth 1 -maxdepth 1 "${keep[@]}" -exec rm -rf {} +
 cp -a "$work/." "$public/"
 cd "$public"
 git add -A
+# its .gitignore must not hold back a file meant to go public
+missing=$(cd "$work" && find . -type f | sed 's|^\./||' | sort | comm -23 - <(git -C "$public" ls-files --cached | sort))
+if [ -n "$missing" ]; then
+  echo "refused: the public .gitignore holds these back ($(echo "$missing" | wc -l) files), e.g.:" >&2
+  echo "$missing" | head -5 >&2
+  exit 1
+fi
 if git diff --cached --quiet; then
   echo "the public copy is already up to date"
   exit 0
