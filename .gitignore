@@ -1,0 +1,11 @@
+# Electron and the Flash plugin are downloads, not source: README.md says
+# which versions and where they came from.
+/electron/
+/electron-win/
+/flash/
+/dist/
+/tools/bin/
+/installer/node_modules/
+
+# kept in the private repository, never here
+*.md

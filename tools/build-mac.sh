@@ -1,0 +1,64 @@
+#!/bin/bash
+# makes the macOS disk image players get: dist/Burrow-macos.dmg, Burrow beside a
+# shortcut to Applications to drag it onto. run it on a Mac (BUILDING.md).
+#
+#   tools/build-mac.sh [--server https://play.burrow.moe] [--flash /path/to/PepperFlashPlayer.plugin]
+#
+# not yet run by anyone: written on linux from electron's layout.
+set -euo pipefail
+
+here=$(cd "$(dirname "$0")/.." && pwd)
+version=11.5.0
+server="https://play.burrow.moe"  # --server for another (http://127.0.0.1:8080 to try a build here)
+flash=$here/flash/PepperFlashPlayer.plugin
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --server) server=$2; shift 2 ;;
+    --flash) flash=$2; shift 2 ;;
+    *) echo "unknown argument: $1" >&2; exit 2 ;;
+  esac
+done
+[ -d "$flash" ] || { echo "no flash plugin at $flash (BUILDING.md says where to get it)" >&2; exit 1; }
+
+dist=$here/dist
+work=$(mktemp -d)
+mkdir -p "$dist"
+cd "$work"
+
+base=https://github.com/electron/electron/releases/download/v$version
+zip=electron-v$version-darwin-x64.zip
+curl -fLO "$base/$zip"
+curl -fLO "$base/SHASUMS256.txt"
+grep " \*$zip\$" SHASUMS256.txt | shasum -a 256 -c -
+
+# ditto keeps the symlinks inside the frameworks, which unzip may not
+ditto -x -k "$zip" .
+mv Electron.app Burrow.app
+res=Burrow.app/Contents/Resources
+rm -f "$res/default_app.asar"
+cp -R "$here/app" "$res/app"
+mkdir "$res/flash"
+cp -R "$flash" "$res/flash/PepperFlashPlayer.plugin"
+if [ -n "$server" ]; then
+  printf '{"server": "%s"}\n' "$server" > "$res/app/build.json"
+fi
+
+plist=Burrow.app/Contents/Info.plist
+/usr/libexec/PlistBuddy -c "Set :CFBundleName Burrow" -c "Set :CFBundleDisplayName Burrow" -c "Set :CFBundleIdentifier software.burrow.client" "$plist"
+
+mkdir icon.iconset
+for size in 16 32 128 256; do
+  sips -z $size $size "$here/app/icon.png" --out icon.iconset/icon_${size}x${size}.png >/dev/null
+  sips -z $((size * 2)) $((size * 2)) "$here/app/icon.png" --out icon.iconset/icon_${size}x${size}@2x.png >/dev/null
+done
+iconutil -c icns icon.iconset -o "$res/electron.icns"
+
+# unsigned by a developer; an ad-hoc signature at least keeps the bundle whole
+codesign --force --deep --sign - Burrow.app
+
+mkdir image
+mv Burrow.app image/
+ln -s /Applications image/Applications
+rm -f "$dist/Burrow-macos.dmg"
+hdiutil create -volname Burrow -srcfolder image -ov -format UDZO "$dist/Burrow-macos.dmg"
+shasum -a 256 "$dist/Burrow-macos.dmg"
