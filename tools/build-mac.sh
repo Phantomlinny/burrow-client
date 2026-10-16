@@ -4,7 +4,7 @@
 #
 #   tools/build-mac.sh [--server https://play.burrow.moe] [--flash /path/to/PepperFlashPlayer.plugin]
 #
-# not yet run by anyone: written on linux from electron's layout.
+# first run 2026-10-16, in a macOS VM.
 set -euo pipefail
 
 here=$(cd "$(dirname "$0")/.." && pwd)
