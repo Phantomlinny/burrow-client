@@ -387,7 +387,7 @@
           <label>Starting room
             <input id="starting-room" type="text" spellcheck="false" placeholder="jamaa_township.room_main">
           </label>
-          <label class="check"><input id="start-in-den" type="checkbox"> Start in den</label>
+          <label class="check"><input id="start-in-den" type="checkbox" checked> Start in den</label>
           <label class="check"><input id="start-muted" type="checkbox"> Start muted</label>
           <label class="check"><input id="use-gpu" type="checkbox"> Use GPU</label>
           <p class="hint" id="gpu-hint" style="margin-top: -6px" hidden>Applies after restart.</p>
@@ -678,14 +678,15 @@
       };
 
       // servers reachable by strangers ignore these choices unless told
-      // otherwise; member or not is the player's choice on a server that says
-      // so (membershipChoice), the other account types stay locked there.
+      // otherwise; member or not, and guide or not, are the player's choice on
+      // a server that says so (membershipChoice), the other account types stay
+      // locked there.
       const MEMBERSHIP_TYPES = ["", "0", "2"];
       const showWhetherChoicesApply = flashVars => {
         const honoured = flashVars.loginChoices !== false;
         const membership = honoured || flashVars.membershipChoice === true;
         for (const field of document.querySelectorAll("[data-choice]")) {
-          field.disabled = field.id === "account-type" ? !membership : !honoured;
+          field.disabled = ["account-type", "guide"].includes(field.id) ? !membership : !honoured;
         }
         for (const option of $("account-type").options) {
           option.disabled = !honoured && !MEMBERSHIP_TYPES.includes(option.value);
@@ -694,7 +695,7 @@
           $("account-type").value = "";
         }
         $("choices-hint").hidden = honoured;
-        $("choices-hint").textContent = honoured ? "" : membership ? "Developer and Guide are locked by this server." : "Locked by this server.";
+        $("choices-hint").textContent = honoured ? "" : membership ? "Developer is locked by this server." : "Locked by this server.";
       };
 
       const getJson = async (url, options) => {
@@ -1137,6 +1138,10 @@
           }
           else if (event.channel === "reportError") {
             reportError(event.args[0]);
+          }
+          else if (event.channel === "openPage") {
+            // main.js opens http and https addresses only
+            window.client.openPage(String(event.args[0]));
           }
         });
         $("loading").hidden = false;

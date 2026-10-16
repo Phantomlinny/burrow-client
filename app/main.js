@@ -236,11 +236,7 @@ const mayLoad = details => {
 // header), and this client's page is a file. so the calls the page
 // needs are made from here, where a request carries no origin.
 const API_CALLS = {status: ["GET", "/api/status"], register: ["POST", "/api/register"], ban: ["POST", "/api/ban"]};
-ipcMain.handle("api", (event, serverUrl, call, body) => new Promise(resolve => {
-  if (!API_CALLS[call] || !/^https?:\/\//.test(String(serverUrl))) {
-    resolve({status: 0, body: {}});
-    return;
-  }
+const apiRequest = (serverUrl, call, body) => new Promise(resolve => {
   const [method, apiPath] = API_CALLS[call];
   const started = Date.now();
   const request = net.request({method, url: new URL(apiPath, serverUrl).href, partition: API_PARTITION});
@@ -273,7 +269,21 @@ ipcMain.handle("api", (event, serverUrl, call, body) => new Promise(resolve => {
     request.write(JSON.stringify(body || {}));
   }
   request.end();
-}));
+});
+ipcMain.handle("api", async (event, serverUrl, call, body) => {
+  if (!API_CALLS[call] || !/^https?:\/\//.test(String(serverUrl))) {
+    return {status: 0, body: {}};
+  }
+  const first = await apiRequest(serverUrl, call, body);
+  if (call !== "status" || first.status === 0) {
+    return first;
+  }
+  // the ping. the first request may have had to make the connection (and
+  // a packet of that lost costs a whole second, or three); the one right
+  // after it goes over that connection, which is what the game's own does.
+  const second = await apiRequest(serverUrl, call, body);
+  return second.status === 0 ? first : second;
+});
 
 // the server's captcha (its lib/captcha.js). cloudflare's widget does not
 // run in the login page, which is a file, so it is the server's own

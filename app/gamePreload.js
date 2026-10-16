@@ -5,6 +5,7 @@ const { ipcRenderer, contextBridge } = require("electron");
 const sendWhitelist = new Set()
   .add("initialized")
   .add("fps")
+  .add("openPage")
   .add("printImage")
   .add("reloadGame")
   .add("reportError")

@@ -33,6 +33,10 @@ module.exports.use = (remoteHost, port, secure) => new Promise(resolve => {
   }
   const relay = net.createServer(local => {
     const remote = secure ? tls.connect({host: remoteHost, port}) : net.connect(port, remoteHost);
+    // the game sends small messages, often two at once: without these the
+    // second waits for the first's answer from the other end (Nagle).
+    local.setNoDelay(true);
+    remote.setNoDelay(true);
     local.pipe(remote);
     remote.pipe(local);
     const close = () => {
