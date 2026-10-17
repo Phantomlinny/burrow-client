@@ -20,7 +20,7 @@ MCowBQYDK2VwAyEAvFgBu6kqSLUj9RSK16gBvpGtUoHHuoqtMqZhUzaOEHo=
 -----END PUBLIC KEY-----
 `);
 const FIRST_CHECK_MS = 10000;
-const CHECK_EVERY_MS = 6 * 3600000;
+const CHECK_EVERY_MS = 30 * 60000; // latest.json is a few hundred bytes
 const TIMEOUT_MS = 60000;
 const MAX_MANIFEST_BYTES = 64 * 1024;
 const MAX_BUNDLE_BYTES = 20 * 1024 * 1024;

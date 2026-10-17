@@ -250,6 +250,7 @@
       #bar button { border: 0; padding: 3px 10px 4px; font-size: 13px; color: var(--muted); }
       #bar button:hover { color: var(--text); background: var(--raised); }
       #bar button[aria-pressed="true"], #bar button[aria-expanded="true"] { color: #000; background: var(--text); }
+      #bar #bar-update { color: #000; background: var(--text); font-weight: 700; }
       body.fullscreen { --bar-height: 0px; }
       body.fullscreen #bar, body.fullscreen #stats { display: none; }
       #stage { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; background: #000; min-height: 0; }
@@ -436,6 +437,7 @@
     <div id="game" hidden>
       <div id="bar">
         <span id="who"></span>
+        <button id="bar-update" type="button" hidden></button>
         <span id="glance"><span id="glance-badge" class="badge off" hidden>Offline</span><span id="glance-text"></span><span id="fps" title="Pictures the game drew in the last second"></span><span id="note" role="status"></span></span>
         <button id="stats-toggle" type="button" aria-expanded="false" aria-controls="stats">Stats</button>
         <button id="mute" type="button" aria-pressed="false" title="F7">Mute</button>
@@ -1392,21 +1394,30 @@
 
       // updates (the client's updater.js): one fetched waits for a restart,
       // and one that needs a new install is a download from the server's site.
+      // shown on the login card, and on the game's bar for those playing.
       let update = null;
       const showUpdate = state => {
         update = state;
         $("update-line").hidden = !state;
+        $("bar-update").hidden = !state;
         if (state) {
           $("update-button").textContent = state.state === "ready" ? `Update ${state.version} ready · Restart` : `Burrow ${state.version} · Download`;
+          $("bar-update").textContent = state.state === "ready" ? `Update ${state.version} · Restart` : `Burrow ${state.version} · Download`;
         }
       };
       window.client.onUpdate(showUpdate);
-      $("update-button").addEventListener("click", () => {
+      const takeUpdate = () => {
         if (update && update.state === "ready") {
           window.client.restartToUpdate();
         }
         else if (update) {
           window.client.openPage(`${info.defaultServer}/`);
+        }
+      };
+      $("update-button").addEventListener("click", takeUpdate);
+      $("bar-update").addEventListener("click", () => {
+        if (!update || update.state !== "ready" || window.confirm("Restart Burrow now to update? This leaves the game.")) {
+          takeUpdate();
         }
       });
       $("auto-update").addEventListener("change", () => window.client.setAutoUpdate($("auto-update").checked));
