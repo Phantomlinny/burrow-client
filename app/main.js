@@ -3,6 +3,7 @@
 const {app, BrowserWindow, ipcMain, net, session, shell, webContents} = require("electron");
 const fs = require("fs");
 const path = require("path");
+const device = require("./device.js");
 const relay = require("./relay.js");
 const updater = require("./updater.js");
 
@@ -182,6 +183,9 @@ ipcMain.handle("setGpu", (event, on) => {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify({...readSettings(), gpu: on === true}));
 });
 
+// what the server is told about this computer at sign-in (device.js).
+ipcMain.handle("device", () => device.device());
+
 ipcMain.handle("info", () => ({
   // as this run was started; a change takes effect at the next start.
   gpu: usesGpu,
@@ -274,7 +278,8 @@ ipcMain.handle("api", async (event, serverUrl, call, body) => {
   if (!API_CALLS[call] || !/^https?:\/\//.test(String(serverUrl))) {
     return {status: 0, body: {}};
   }
-  const first = await apiRequest(serverUrl, call, body);
+  // a sign-up says which computer it is on, as a sign-in does (device.js).
+  const first = await apiRequest(serverUrl, call, call === "register" ? {...body, device: await device.device()} : body);
   if (call !== "status" || first.status === 0) {
     return first;
   }
@@ -480,6 +485,7 @@ app.on("web-contents-created", (event, contents) => {
 });
 
 app.whenReady().then(() => {
+  device.device(); // read now, so the first sign-in does not wait
   session.defaultSession.webRequest.onBeforeRequest((details, answer) => answer({cancel: !mayLoad(details)}));
   session.fromPartition(CAPTCHA_PARTITION).webRequest.onBeforeRequest((details, answer) => {
     let url = null;

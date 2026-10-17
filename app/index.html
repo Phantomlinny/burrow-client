@@ -336,7 +336,7 @@
             <label>2FA code
               <input id="totp" type="text" inputmode="numeric" maxlength="20" spellcheck="false">
             </label>
-            <label class="check"><input id="remember-device" type="checkbox"> Trust this computer for 30 days</label>
+            <label class="check"><input id="remember-device" type="checkbox"> Trust this device for 30 days</label>
           </div>
           <label class="check"><input id="remember" type="checkbox"> Remember me</label>
           <button id="log-in" class="main" type="submit">Log in</button>
@@ -498,6 +498,7 @@
         choose_animal: "Choose an animal first.",
         too_many_registrations: "Too many accounts were created from your address. Try again in an hour.",
         address_banned: "Your address is banned.",
+        device_banned: "This device is banned.",
         agree_first: "Tick the box to agree first.",
         same_name: "That is the name that was rejected.",
         captcha_required: "Complete the captcha.",
@@ -646,7 +647,7 @@
           remove.type = "button";
           remove.className = "forget";
           remove.textContent = "×";
-          remove.title = `Forget ${entry.username} on this computer`;
+          remove.title = `Forget ${entry.username} on this device`;
           remove.setAttribute("aria-label", remove.title);
           remove.addEventListener("click", () => {
             forget(entry.server, entry.username);
@@ -783,13 +784,13 @@
       let banServer = null;
       // the popup of a ban: how long, why, and where to ask about it (and,
       // when it is for good, where the account can be deleted).
-      // `ofAddress`: it is the address that is banned, not the account.
-      const showBan = (server, username, seconds, reason, ofAddress = false) => {
+      // `of`: what is banned: false the account, true its address, "device" this device.
+      const showBan = (server, username, seconds, reason, of = false) => {
         banServer = server;
         const left = Number(seconds);
         $("ban-title").textContent = banTitle(left);
         $("ban-name").textContent = username;
-        $("ban-address").textContent = ofAddress ? " · your address" : "";
+        $("ban-address").textContent = of === "device" ? " · this device" : of ? " · your address" : "";
         $("ban-reason-part").hidden = !reason;
         $("ban-facts").classList.toggle("bare", !reason);
         $("ban-until").textContent = left < 0 ? "Permanent"
@@ -872,10 +873,13 @@
             remember_device: !$("code-part").hidden && $("remember-device").checked,
             captcha_pass: given ? given.captchaPass : passFor(server, username),
           };
+        // which computer this is (the client's device.js): the server lets no
+        // sign-in in without it.
+        const device = await window.client.device();
         const authenticate = body => getJson(`${server}/authenticate`, {
           method: "POST",
           headers: {"Content-Type": "application/json"},
-          body: JSON.stringify(body),
+          body: JSON.stringify({...body, device}),
         });
         let auth = await authenticate(request);
         if (auth.body.error === "captcha_required") {
@@ -891,6 +895,9 @@
         if (SIGNUP_MESSAGES[auth.body.error] && /^captcha_/.test(auth.body.error)) {
           throw new Error(SIGNUP_MESSAGES[auth.body.error]);
         }
+        if (auth.status === 426 || auth.body.error === "client_outdated") {
+          throw new Error("This server needs a newer Burrow client. Update it from the server's download page.");
+        }
         if (auth.status === 401 && auth.body.error === "totp_required") {
           showCodePart(true);
           $("totp").focus();
@@ -904,9 +911,10 @@
         // banned: for good, or for how much longer. (A saved sign-in is
         // kept: it is the ban that is in the way, not the sign-in.)
         // An address is banned for good, whoever signs in from it.
-        if (auth.status === 401 && (auth.body.error === "account_banned" || auth.body.error === "address_banned")) {
-          const ofAddress = auth.body.error === "address_banned";
-          showBan(server, username, ofAddress ? -1 : Number(auth.body.banned_seconds), String(auth.body.ban_reason || ""), ofAddress);
+        // A computer likewise (the server's lib/devices.js).
+        if (auth.status === 401 && ["account_banned", "address_banned", "device_banned"].includes(auth.body.error)) {
+          const of = auth.body.error === "device_banned" ? "device" : auth.body.error === "address_banned";
+          showBan(server, username, of ? -1 : Number(auth.body.banned_seconds), String(auth.body.ban_reason || ""), of);
           throw new Error("Banned.");
         }
         if (auth.status === 401 && auth.body.error === "name_rejected") {
@@ -1085,7 +1093,7 @@
             closeGame();
           }
           showBan(ended.server, ended.flashVars.username, Number(answer.body.banned_seconds), String(answer.body.ban_reason || ""),
-            answer.body.banned === "address");
+            answer.body.banned === "device" ? "device" : answer.body.banned === "address");
         }
       };
 

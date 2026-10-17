@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("client", {
   useServer: (serverUrl, gamePort, gameHost) => ipcRenderer.invoke("useServer", serverUrl, gamePort, gameHost),
   // one of the server's /api calls ("status", "register", "ban"): {status, body, ms}.
   api: (serverUrl, call, body) => ipcRenderer.invoke("api", serverUrl, call, body),
+  // hashes of this computer's ids, for the server's sign-in (device.js).
+  device: () => ipcRenderer.invoke("device"),
   // the server's captcha ("login" or "signup") in a window of its own: its answer, or "" when there is none.
   captcha: (serverUrl, action) => ipcRenderer.invoke("captcha", serverUrl, action),
   setGpu: on => ipcRenderer.invoke("setGpu", on),
