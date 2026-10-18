@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld("client", {
   showFile: file => ipcRenderer.send("showFile", file),
   toggleFullscreen: () => ipcRenderer.send("toggleFullscreen"),
   openPage: url => ipcRenderer.send("openPage", url),
+  // Discord rich presence (discord.js): {appId, state, start, url}, or null.
+  presence: info => ipcRenderer.send("presence", info),
   onFullscreen: listener => ipcRenderer.on("fullscreen", (event, on) => listener(on)),
   onShortcut: listener => ipcRenderer.on("shortcut", (event, key) => listener(key)),
 });

@@ -1058,7 +1058,20 @@
         }
       };
 
+      // Discord rich presence (discord.js), while the game is open: the
+      // server's Discord application (flashvars discordAppId), where the
+      // player is and since when they have played.
+      const showPresence = state => {
+        if (!session || !session.flashVars || !session.flashVars.discordAppId) {
+          return;
+        }
+        session.presenceState = state || session.presenceState || "";
+        window.client.presence({appId: session.flashVars.discordAppId, state: session.presenceState,
+          start: session.since || Date.now(), url: session.flashVars.presenceUrl});
+      };
+
       const closeGame = message => {
+        window.client.presence(null);
         $("fps").textContent = "";
         if (webview) {
           webview.remove();
@@ -1153,6 +1166,10 @@
             // main.js opens http and https addresses only
             window.client.openPage(String(event.args[0]));
           }
+          else if (event.channel === "presence") {
+            // where the player is now (the game's AJClient.presenceRoom)
+            showPresence(String(event.args[0] || ""));
+          }
         });
         $("loading").hidden = false;
         clearTimeout(loadingTimer);
@@ -1176,6 +1193,7 @@
           session = await login();
           setStatus("", false, statusId);
           openGame();
+          showPresence("");
         }
         catch (err) {
           $("log-in").disabled = false;

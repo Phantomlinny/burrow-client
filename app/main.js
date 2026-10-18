@@ -4,6 +4,7 @@ const {app, BrowserWindow, ipcMain, net, session, shell, webContents} = require(
 const fs = require("fs");
 const path = require("path");
 const device = require("./device.js");
+const discord = require("./discord.js");
 const relay = require("./relay.js");
 const updater = require("./updater.js");
 
@@ -424,6 +425,12 @@ ipcMain.on("openPage", (event, url) => {
   if (/^https?:\/\//.test(String(url))) {
     shell.openExternal(String(url));
   }
+});
+
+// Discord rich presence (discord.js): {appId, state, start, url} while the
+// game is open, null when it is not.
+ipcMain.on("presence", (event, info) => {
+  discord.set(info && typeof info === "object" ? info : null);
 });
 
 ipcMain.on("toggleFullscreen", () => {
