@@ -39,6 +39,9 @@ let ready = false;
 let retry = null;
 let buffer = Buffer.alloc(0);
 
+// a request's id. (not crypto.randomUUID: Electron 11's Node 12 has none)
+const nonce = () => crypto.randomBytes(16).toString("hex");
+
 const frame = (op, data) => {
   const body = Buffer.from(JSON.stringify(data));
   const head = Buffer.alloc(8);
@@ -52,7 +55,7 @@ const send = () => {
     return;
   }
   socket.write(frame(OP_FRAME, {cmd: "SET_ACTIVITY", args: {pid: process.pid, activity: wanted.activity},
-    nonce: crypto.randomUUID()}));
+    nonce: nonce()}));
 };
 
 const drop = () => {
@@ -158,7 +161,7 @@ const set = info => {
     if (wanted) {
       wanted = null;
       if (socket && ready) {
-        socket.write(frame(OP_FRAME, {cmd: "SET_ACTIVITY", args: {pid: process.pid}, nonce: crypto.randomUUID()}));
+        socket.write(frame(OP_FRAME, {cmd: "SET_ACTIVITY", args: {pid: process.pid}, nonce: nonce()}));
       }
     }
     return;
