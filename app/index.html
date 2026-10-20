@@ -1166,6 +1166,12 @@
             // main.js opens http and https addresses only
             window.client.openPage(String(event.args[0]));
           }
+          else if (event.channel === "ownVideo") {
+            // the player's own theatre video (the game page's link box): main.js
+            // lets that one address load, then the page plays it.
+            const link = String(event.args[0] || "");
+            window.client.ownVideo(link).then(() => webview.send("ownVideoReady", link));
+          }
           else if (event.channel === "presence") {
             // where the player is now (the game's AJClient.presenceRoom)
             showPresence(String(event.args[0] || ""));

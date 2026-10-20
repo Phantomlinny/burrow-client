@@ -220,6 +220,25 @@ ipcMain.handle("useServer", (event, serverUrl, gamePort, gameHost) => {
 // fetch from elsewhere (a picture named in a chat line once did) would hand
 // a stranger the player's address, or the plugin a stranger's file.
 const LOCAL_SCHEMES = ["file:", "devtools:", "chrome-devtools:", "chrome:", "data:", "blob:", "about:"];
+
+// the theatre's video (the server's game page: the room's, played by staff,
+// and the player's own from its link box): the YouTube and Vimeo players
+// and what they load, measured in this Electron. a host here counts with
+// every host under it.
+const VIDEO_PLAYER_HOSTS = [
+  "youtube-nocookie.com", "youtube.com", "ytimg.com", "ggpht.com", "googlevideo.com",
+  "jnn-pa.googleapis.com", "gstatic.com", "www.google.com",
+  "vimeo.com", "vimeocdn.com",
+];
+const videoPlayerHost = host => VIDEO_PLAYER_HOSTS.some(known => host === known || host.endsWith(`.${known}`));
+// the player's own sound or video file (the game page's link box): the one
+// address they typed, as the game page says it (ownVideo below), and where
+// it redirects. a <video>'s file is an "other" request in this Electron, as
+// is everything the Flash plugin asks for; those stay on the game's server
+// otherwise.
+let ownMedia = null;
+const ownMediaRequests = new Set(); // request ids of it, through redirects
+const withoutHash = url => url.href.replace(/#.*$/, "");
 const mayLoad = details => {
   let url;
   try {
@@ -234,8 +253,41 @@ const mayLoad = details => {
   if (win && details.webContentsId === win.webContents.id) {
     return url.protocol === "http:" || url.protocol === "https:";
   }
-  return gameOrigin !== null && url.origin === gameOrigin;
+  if (gameOrigin !== null && url.origin === gameOrigin) {
+    return true;
+  }
+  if (gameOrigin === null || (url.protocol !== "https:" && url.protocol !== "http:") || details.resourceType === "object") {
+    return false;
+  }
+  if (details.resourceType === "other" || details.resourceType === "media") {
+    if (ownMediaRequests.has(details.id) || (ownMedia !== null && withoutHash(url) === ownMedia)) {
+      ownMediaRequests.add(details.id);
+      return true;
+    }
+    return false;
+  }
+  return url.protocol === "https:" && videoPlayerHost(url.hostname.toLowerCase());
 };
+
+// the link the player put in the theatre's box, or "" when it stopped: from
+// the login page (index.html), which hears it from the game page. resolves
+// once requests for it may go.
+ipcMain.handle("ownVideo", (event, link) => {
+  if (!win || event.sender !== win.webContents) {
+    return false;
+  }
+  ownMedia = null;
+  try {
+    const url = new URL(String(link || ""));
+    if (url.protocol === "https:" || url.protocol === "http:") {
+      ownMedia = withoutHash(url);
+    }
+  }
+  catch (err) {
+    // stopped, or not an address
+  }
+  return ownMedia !== null;
+});
 
 // the server's /api only answers its own pages (it checks the Origin
 // header), and this client's page is a file. so the calls the page
@@ -494,6 +546,10 @@ app.on("web-contents-created", (event, contents) => {
 app.whenReady().then(() => {
   device.device(); // read now, so the first sign-in does not wait
   session.defaultSession.webRequest.onBeforeRequest((details, answer) => answer({cancel: !mayLoad(details)}));
+  // only watching: in Electron 11 a listener that may change requests
+  // (onBeforeSendHeaders, even one that changes nothing) stops YouTube's player.
+  session.defaultSession.webRequest.onCompleted(details => ownMediaRequests.delete(details.id));
+  session.defaultSession.webRequest.onErrorOccurred(details => ownMediaRequests.delete(details.id));
   session.fromPartition(CAPTCHA_PARTITION).webRequest.onBeforeRequest((details, answer) => {
     let url = null;
     try {
