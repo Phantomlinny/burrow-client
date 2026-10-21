@@ -76,6 +76,21 @@ const SANDBOXED = !app.commandLine.hasSwitch("aj-no-renderer-sandbox");
 // the main process's own calls to a server get a session to themselves, so
 // that the rule below about what pages may load does not apply to them.
 const API_PARTITION = "aj-api";
+// the theatre's browser (experimental, index.html): a webview of its own
+// over the theatre screen, in a session of its own that is kept in memory
+// only, so nothing it visits stays and none of it reaches the game.
+const BROWSER_PARTITION = "aj-browser";
+let browserSession = null;
+const isBrowser = contents => browserSession !== null && contents.session === browserSession;
+const webAddress = text => {
+  try {
+    const url = new URL(String(text));
+    return url.protocol === "https:" || url.protocol === "http:";
+  }
+  catch (err) {
+    return false;
+  }
+};
 
 // two copies cannot share one HTTP cache: the second to start moves the
 // first one's cache aside, and the first then gets broken game files out of
@@ -493,16 +508,38 @@ ipcMain.on("toggleFullscreen", () => {
 
 app.on("web-contents-created", (event, contents) => {
   // the game page is a guest: it gets our preload and nothing more.
-  contents.on("will-attach-webview", (attachEvent, webPreferences) => {
-    webPreferences.preload = GAME_PRELOAD;
+  contents.on("will-attach-webview", (attachEvent, webPreferences, params) => {
     webPreferences.nodeIntegration = false;
     webPreferences.contextIsolation = true;
+    // the theatre's browser: a web page like any, with nothing of ours.
+    if (params.partition === BROWSER_PARTITION) {
+      delete webPreferences.preload;
+      delete webPreferences.preloadURL;
+      webPreferences.sandbox = true;
+      webPreferences.plugins = false;
+      webPreferences.webviewTag = false;
+      if (!webAddress(params.src)) {
+        params.src = "about:blank";
+      }
+      return;
+    }
+    if (params.partition) {
+      attachEvent.preventDefault();
+      return;
+    }
+    webPreferences.preload = GAME_PRELOAD;
     webPreferences.backgroundThrottling = false;
     webPreferences.sandbox = SANDBOXED;
   });
   // the login page stays the login page, and the game page stays on its
   // server: a page that arrived any other way would inherit what these have.
   contents.on("will-navigate", (navigateEvent, url) => {
+    if (isBrowser(contents)) {
+      if (!webAddress(url)) {
+        navigateEvent.preventDefault();
+      }
+      return;
+    }
     let origin = null;
     try {
       origin = new URL(url).origin;
@@ -516,6 +553,13 @@ app.on("web-contents-created", (event, contents) => {
   });
   contents.on("new-window", (windowEvent, url) => {
     windowEvent.preventDefault();
+    // the theatre's browser opens a new window's page in itself
+    if (isBrowser(contents)) {
+      if (webAddress(url)) {
+        contents.loadURL(url);
+      }
+      return;
+    }
     if (/^https?:\/\//.test(url)) {
       shell.openExternal(url);
     }
@@ -550,6 +594,24 @@ app.whenReady().then(() => {
   // (onBeforeSendHeaders, even one that changes nothing) stops YouTube's player.
   session.defaultSession.webRequest.onCompleted(details => ownMediaRequests.delete(details.id));
   session.defaultSession.webRequest.onErrorOccurred(details => ownMediaRequests.delete(details.id));
+  // the theatre's browser: the web, and nothing of this computer's; no
+  // camera, microphone, notifications or the like, and no downloads. it says
+  // it is plain Chrome, which sites know, not this client.
+  browserSession = session.fromPartition(BROWSER_PARTITION);
+  browserSession.setUserAgent(browserSession.getUserAgent().replace(/ (?:Electron|Burrow|aj-private-client)\/\S+/gi, ""));
+  browserSession.setPermissionRequestHandler((contents, permission, answer) => answer(false));
+  browserSession.setPermissionCheckHandler(() => false);
+  browserSession.on("will-download", downloadEvent => downloadEvent.preventDefault());
+  browserSession.webRequest.onBeforeRequest((details, answer) => {
+    let url = null;
+    try {
+      url = new URL(details.url);
+    }
+    catch (err) {
+      // not an address: refused.
+    }
+    answer({cancel: !url || !["https:", "http:", "data:", "blob:", "about:"].includes(url.protocol)});
+  });
   session.fromPartition(CAPTCHA_PARTITION).webRequest.onBeforeRequest((details, answer) => {
     let url = null;
     try {

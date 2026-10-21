@@ -1,7 +1,7 @@
 {
     "name": "aj-private-client",
     "productName": "Burrow",
-    "version": "1.3.2",
+    "version": "1.3.3",
     "description": "The client for the Burrow private server",
     "main": "boot.js",
     "license": "UNLICENSED"

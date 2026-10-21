@@ -6,6 +6,7 @@ const sendWhitelist = new Set()
   .add("initialized")
   .add("fps")
   .add("openPage")
+  .add("browser")
   .add("ownVideo")
   .add("presence")
   .add("printImage")
@@ -17,6 +18,8 @@ const receiveWhitelist = new Set()
   .add("flashVarsReady")
   .add("hud")
   .add("ownVideoReady")
+  .add("browserSupported")
+  .add("browserState")
   .add("removed");
 
 contextBridge.exposeInMainWorld(
