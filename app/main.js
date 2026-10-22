@@ -353,7 +353,12 @@ ipcMain.handle("captcha", (event, serverUrl, action) => new Promise(resolve => {
     captchaServer = null;
     answer("");
   });
-  box.loadURL(new URL(`/captcha?action=${action === "signup" ? "signup" : "login"}`, server).href);
+  box.loadURL(new URL(`/captcha?action=${action === "signup" ? "signup" : "login"}`, server).href).catch(() => {
+    answer("");
+    if (!box.isDestroyed()) {
+      box.close();
+    }
+  });
 }));
 
 // what the client's processes use: the game is the "Pepper Plugin" one.
