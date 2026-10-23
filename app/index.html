@@ -529,6 +529,11 @@
       const METRICS_EVERY_MS = 2000;
       // the game says when it is drawn; if it never does, show it anyway.
       const LOADING_AT_MOST_MS = 25000;
+      // a game not drawn this long after it started, with the graphics card
+      // in use, is taken for one the card keeps from drawing (main.js
+      // gpuFallback): the client starts again without it.
+      const GPU_WATCH_MS = 60000;
+      let gpuWatch = null;
 
       let info = null;
       let session = null; // {server, flashVars, since} while the game is open
@@ -1089,6 +1094,7 @@
       };
 
       const closeGame = message => {
+        clearTimeout(gpuWatch);
         window.client.presence(null);
         $("fps").textContent = "";
         if (webview) {
@@ -1272,6 +1278,7 @@
             $("fps").textContent = `· ${Number(event.args[0]) || 0} fps`;
           }
           if (event.channel === "initialized") {
+            clearTimeout(gpuWatch);
             gameIsDrawn();
           }
           else if (event.channel === "reloadGame") {
@@ -1316,6 +1323,13 @@
         $("loading").hidden = false;
         clearTimeout(loadingTimer);
         loadingTimer = setTimeout(gameIsDrawn, LOADING_AT_MOST_MS);
+        clearTimeout(gpuWatch);
+        if (info && info.gpu) {
+          gpuWatch = setTimeout(() => {
+            closeGame("The game did not start with the graphics card. Burrow is restarting without it (Use GPU, under Advanced, turns it back on).");
+            setTimeout(() => window.client.gpuFallback(), 4000);
+          }, GPU_WATCH_MS);
+        }
         $("stage").prepend(webview);
         $("who").textContent = `${session.flashVars.username} · ${new URL(session.server).host}`;
         $("stats-tip").textContent = fieldValue("account-type") === "4"

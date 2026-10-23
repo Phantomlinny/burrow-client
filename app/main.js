@@ -211,6 +211,17 @@ let updateState = null; // the last thing the updater said, for a page loaded af
 ipcMain.handle("setGpu", (event, on) => {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify({...readSettings(), gpu: on === true}));
 });
+// some graphics cards (or their drivers) leave the game on its loading
+// screen for good; players got past it by turning "Use GPU" off. the page
+// asks for that itself when the game has not drawn in time (index.html).
+ipcMain.on("gpuFallback", () => {
+  if (!usesGpu || app.commandLine.hasSwitch("aj-gpu")) {
+    return;
+  }
+  fs.writeFileSync(SETTINGS_FILE, JSON.stringify({...readSettings(), gpu: false}));
+  app.relaunch();
+  app.exit(0);
+});
 
 // what the server is told about this computer at sign-in (device.js).
 ipcMain.handle("device", () => device.device());

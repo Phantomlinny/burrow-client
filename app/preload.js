@@ -13,6 +13,9 @@ contextBridge.exposeInMainWorld("client", {
   // the server's captcha ("login" or "signup") in a window of its own: its answer, or "" when there is none.
   captcha: (serverUrl, action) => ipcRenderer.invoke("captcha", serverUrl, action),
   setGpu: on => ipcRenderer.invoke("setGpu", on),
+  // the game did not start drawing with the graphics card: it is turned off
+  // (as "Use GPU" would) and the client starts again.
+  gpuFallback: () => ipcRenderer.send("gpuFallback"),
   setAutoUpdate: on => ipcRenderer.invoke("setAutoUpdate", on),
   restartToUpdate: () => ipcRenderer.send("restartToUpdate"),
   // {state: "ready" | "download", version} from updater.js
