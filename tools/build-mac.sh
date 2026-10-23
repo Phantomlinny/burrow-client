@@ -53,6 +53,11 @@ fi
 
 plist=Burrow.app/Contents/Info.plist
 /usr/libexec/PlistBuddy -c "Set :CFBundleName Burrow" -c "Set :CFBundleDisplayName Burrow" -c "Set :CFBundleIdentifier software.burrow.client" "$plist"
+# burrow:// links (the account page's "Sign in with the Burrow client"):
+# macOS takes only those the app names here.
+/usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" -c "Add :CFBundleURLTypes:0 dict" \
+  -c "Add :CFBundleURLTypes:0:CFBundleURLName string Burrow" -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" \
+  -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string burrow" "$plist"
 
 mkdir icon.iconset
 for size in 16 32 128 256; do

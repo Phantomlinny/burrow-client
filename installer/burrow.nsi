@@ -53,6 +53,12 @@ Section "Burrow"
   WriteRegStr HKCU "${UNINSTALL_KEY}" "UninstallString" '"$INSTDIR\Uninstall Burrow.exe"'
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${UNINSTALL_KEY}" "NoRepair" 1
+
+  ; burrow:// links, from the account page's "Sign in with the Burrow client"
+  ; (app/main.js writes the same when it starts)
+  WriteRegStr HKCU "Software\Classes\burrow" "" "URL:burrow"
+  WriteRegStr HKCU "Software\Classes\burrow" "URL Protocol" ""
+  WriteRegStr HKCU "Software\Classes\burrow\shell\open\command" "" '"$INSTDIR\Burrow.exe" "%1"'
 SectionEnd
 
 ; only what was installed goes: the folder may be one the player chose, with
@@ -66,4 +72,5 @@ Section "Uninstall"
   Delete "$DESKTOP\Burrow.lnk"
   DeleteRegKey HKCU "${UNINSTALL_KEY}"
   DeleteRegKey HKCU "Software\Burrow"
+  DeleteRegKey HKCU "Software\Classes\burrow"
 SectionEnd

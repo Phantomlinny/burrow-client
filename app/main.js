@@ -24,6 +24,19 @@ if (!app.commandLine.hasSwitch("user-data-dir")) {
   app.setPath("userData", path.join(app.getPath("appData"), "AJ Private Client"));
 }
 
+// burrow:// links: the server's account page asks the client to sign it in
+// ("Sign in with the Burrow client", burrow://account?n=<nonce>; index.html
+// does the rest). windows and linux start a new copy with the link: the copy
+// already running takes it, and the new one goes at once. a copy started to
+// play beside the first still plays; only one that came with a link gives way.
+// macOS hands the link to the running app (open-url) instead.
+const LINK_PROTOCOL = "burrow";
+const linkIn = argv => argv.find(arg => String(arg).toLowerCase().startsWith(`${LINK_PROTOCOL}://`)) || null;
+let pendingLink = linkIn(process.argv);
+if (!app.requestSingleInstanceLock() && pendingLink) {
+  process.exit(0);
+}
+
 // the folder the client was installed with. this one may be an update
 // (boot.js), kept elsewhere; the plugin and build.json stay beside that one.
 const SHIPPED = global.burrow ? global.burrow.shipped : __dirname;
@@ -307,7 +320,8 @@ ipcMain.handle("ownVideo", (event, link) => {
 // the server's /api only answers its own pages (it checks the Origin
 // header), and this client's page is a file. so the calls the page
 // needs are made from here, where a request carries no origin.
-const API_CALLS = {status: ["GET", "/api/status"], register: ["POST", "/api/register"], ban: ["POST", "/api/ban"]};
+const API_CALLS = {status: ["GET", "/api/status"], register: ["POST", "/api/register"], ban: ["POST", "/api/ban"],
+  accountTicket: ["POST", "/account/api/client-ticket"]};
 const apiRequest = (serverUrl, call, body) => new Promise(resolve => {
   const [method, apiPath] = API_CALLS[call];
   const started = Date.now();
@@ -499,6 +513,43 @@ ipcMain.on("openPage", (event, url) => {
   }
 });
 
+// a burrow:// link (above), once the login page is there to take it: only
+// the account page's nonce goes on, and the window comes to the front.
+const accountNonce = link => {
+  try {
+    const url = new URL(link);
+    const nonce = url.searchParams.get("n") || "";
+    return url.protocol === `${LINK_PROTOCOL}:` && url.hostname === "account" && /^[0-9a-f]{48}$/.test(nonce) ? nonce : null;
+  }
+  catch (err) {
+    return null;
+  }
+};
+const takeLink = () => {
+  if (!pendingLink || !win || win.webContents.isLoading()) {
+    return;
+  }
+  const nonce = accountNonce(pendingLink);
+  pendingLink = null;
+  if (nonce) {
+    if (win.isMinimized()) {
+      win.restore();
+    }
+    win.show();
+    win.focus();
+    win.webContents.send("accountLink", nonce);
+  }
+};
+app.on("second-instance", (event, argv) => {
+  pendingLink = linkIn(argv) || pendingLink;
+  takeLink();
+});
+app.on("open-url", (event, link) => {
+  event.preventDefault();
+  pendingLink = link;
+  takeLink();
+});
+
 // Discord rich presence (discord.js): {appId, state, start, url} while the
 // game is open, null when it is not.
 ipcMain.on("presence", (event, info) => {
@@ -649,7 +700,14 @@ app.whenReady().then(() => {
     },
   });
   win.setMenu(null);
+  win.webContents.on("did-finish-load", takeLink);
   win.loadFile(path.join(__dirname, "index.html"));
+  // an installed copy answers burrow:// links (the installers say so too;
+  // this keeps it so after an update or a move). a copy run from the
+  // repository leaves them to the installed one.
+  if (builtFor() && !app.isDefaultProtocolClient(LINK_PROTOCOL)) {
+    app.setAsDefaultProtocolClient(LINK_PROTOCOL);
+  }
   if (builtFor() && global.burrow) {
     updates = updater.start({
       server: builtFor(),

@@ -30,6 +30,10 @@ module.exports = {
     desktopName: "burrow.desktop",
   },
 
+  // burrow:// links, from the account page's "Sign in with the Burrow
+  // client" (the .desktop file's MimeType; app/main.js asks for them too)
+  protocols: [{name: "Burrow", schemes: ["burrow"]}],
+
   linux: {
     target: [{target: "AppImage", arch: ["x64"]}, {target: "deb", arch: ["x64"]}, {target: "rpm", arch: ["x64"]}],
     icon: path.join(root, "app", "icon.png"),

@@ -32,4 +32,6 @@ contextBridge.exposeInMainWorld("client", {
   presence: info => ipcRenderer.send("presence", info),
   onFullscreen: listener => ipcRenderer.on("fullscreen", (event, on) => listener(on)),
   onShortcut: listener => ipcRenderer.on("shortcut", (event, key) => listener(key)),
+  // the server's account page asking to be signed in (main.js): its nonce.
+  onAccountLink: listener => ipcRenderer.on("accountLink", (event, nonce) => listener(String(nonce))),
 });

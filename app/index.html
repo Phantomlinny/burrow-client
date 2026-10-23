@@ -168,11 +168,11 @@
       a { color: inherit; text-underline-offset: 3px; }
       a:hover { color: var(--text); }
 
-      #ban-popup, #rename-popup { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0, 0, 0, 0.85); }
-      #rename-box { width: 100%; max-width: 400px; padding: 28px 28px 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; }
-      #rename-box h2 { margin: 0 0 16px; font-size: 22px; font-weight: 700; }
-      #rename-box .buttons { display: flex; gap: 10px; margin-top: 6px; }
-      #rename-box .buttons button { flex: 1; margin: 0; padding: 10px 16px 11px; font-size: 16px; }
+      #ban-popup, #rename-popup, #link-popup { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 10; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0, 0, 0, 0.85); }
+      #rename-box, #link-box { width: 100%; max-width: 400px; padding: 28px 28px 24px; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; }
+      #rename-box h2, #link-box h2 { margin: 0 0 16px; font-size: 22px; font-weight: 700; }
+      #rename-box .buttons, #link-box .buttons { display: flex; gap: 10px; margin-top: 6px; }
+      #rename-box .buttons button, #link-box .buttons button { flex: 1; margin: 0; padding: 10px 16px 11px; font-size: 16px; }
       #ban-box { width: 100%; max-width: 480px; max-height: 100%; overflow-y: auto; padding: 30px 30px 26px; background: var(--panel); border: 1px solid var(--line); border-radius: 22px; }
       #ban-head { display: flex; align-items: center; gap: 14px; }
       #ban-head img { flex: none; width: 48px; height: 48px; }
@@ -193,8 +193,9 @@
       #ban-buttons button { flex: 1; margin: 0; padding: 10px 16px 11px; font-size: 16px; }
 
       #saved { margin: 0 0 16px; padding: 0; list-style: none; }
-      #saved li { display: flex; gap: 6px; margin: 0 0 6px; }
-      #saved .account {
+      #saved li, #link-accounts li { display: flex; gap: 6px; margin: 0 0 6px; }
+      #link-accounts { margin: 0 0 16px; padding: 0; list-style: none; }
+      #saved .account, #link-accounts .account {
         flex: 1;
         min-width: 0;
         display: flex;
@@ -204,10 +205,10 @@
         text-align: left;
         font-weight: 700;
       }
-      #saved .account::after { content: "→"; margin-left: auto; color: var(--muted); font-weight: 400; }
-      #saved .account:hover { background: var(--text); border-color: var(--text); color: #000; }
+      #saved .account::after, #link-accounts .account::after { content: "→"; margin-left: auto; color: var(--muted); font-weight: 400; }
+      #saved .account:hover, #link-accounts .account:hover { background: var(--text); border-color: var(--text); color: #000; }
       #saved .account:hover::after, #saved .account:hover .where { color: #000; }
-      #saved .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #saved .name, #link-accounts .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #saved .where { font-size: 12px; font-weight: 400; color: var(--muted); white-space: nowrap; }
       #saved .forget { flex: none; width: 40px; padding: 0; border-color: transparent; color: var(--muted); font-size: 18px; }
       #saved .forget:hover { color: var(--text); border-color: var(--line); }
@@ -438,6 +439,16 @@
         </div>
         <p id="rename-status" class="status" role="status"></p>
       </form>
+    </div>
+
+    <div id="link-popup" role="dialog" aria-modal="true" aria-labelledby="link-title" hidden>
+      <div id="link-box">
+        <h2 id="link-title">Sign in to the account page as</h2>
+        <ul id="link-accounts"></ul>
+        <div class="buttons">
+          <button id="link-cancel" type="button">Cancel</button>
+        </div>
+      </div>
     </div>
 
     <div id="game" hidden>
@@ -1339,6 +1350,62 @@
       $("rename-cancel").addEventListener("click", () => {
         closeRename();
         setStatus("");
+      });
+
+      // "Sign in with the Burrow client" on the server's account page (its
+      // lib/manage.js; the link comes through main.js): the account played
+      // now, or one remembered here, gets a ticket from the server that
+      // opens the page signed in, in the browser that asked. the browser
+      // already asked whether to open Burrow, so with one account there is
+      // nothing more to ask.
+      const tellAccountPage = (text, bad) => (session ? note(text) : setStatus(text, bad));
+      const pickAccount = choices => new Promise(resolve => {
+        const list = $("link-accounts");
+        list.textContent = "";
+        const done = choice => {
+          $("link-popup").hidden = true;
+          $("link-cancel").onclick = null;
+          resolve(choice);
+        };
+        for (const choice of choices) {
+          const row = document.createElement("li");
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "account";
+          const name = document.createElement("span");
+          name.className = "name";
+          name.textContent = choice.username;
+          button.append(name);
+          button.addEventListener("click", () => done(choice));
+          row.append(button);
+          list.append(row);
+        }
+        $("link-cancel").onclick = () => done(null);
+        $("link-popup").hidden = false;
+        list.querySelector("button").focus();
+      });
+      window.client.onAccountLink(async nonce => {
+        if (!$("link-popup").hidden) {
+          return;
+        }
+        const choices = session
+          ? [{server: session.server, username: session.flashVars.username, token: session.flashVars.auth_token}]
+          : remembered().filter(entry => entry.server === serverUrl());
+        if (choices.length === 0) {
+          tellAccountPage("Log in here first, then try the account page again.", true);
+          return;
+        }
+        const choice = choices.length === 1 ? choices[0] : await pickAccount(choices);
+        if (!choice) {
+          return;
+        }
+        const answer = await window.client.api(choice.server, "accountTicket", {token: choice.token, nonce});
+        if (answer.status !== 200 || !/^https?:\/\//.test(String(answer.body.url))) {
+          tellAccountPage(answer.body.error || "The account page could not be signed in.", true);
+          return;
+        }
+        window.client.openPage(answer.body.url);
+        tellAccountPage(`Account page signed in as ${answer.body.username}.`, false);
       });
 
       // another name is another account: its code is not this one's.
