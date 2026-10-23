@@ -513,6 +513,50 @@ ipcMain.on("openPage", (event, url) => {
   }
 });
 
+// a picture the game prints (its print kits and art studios, through the
+// game page's ajPrint): {image, a JPEG in base64; width; height}. it goes on
+// a page of its own, in a window that is never shown and runs no script,
+// and the system's print dialog opens for it; nothing of it is kept after.
+const MAX_PRINT_BASE64 = 40 * 1024 * 1024;
+ipcMain.on("printImage", (event, picture) => {
+  const image = picture && typeof picture.image === "string" ? picture.image : "";
+  if (!image || image.length > MAX_PRINT_BASE64 || !/^[A-Za-z0-9+/=\r\n]+$/.test(image)) {
+    return;
+  }
+  const landscape = Number(picture.width) > Number(picture.height);
+  let folder;
+  try {
+    folder = fs.mkdtempSync(path.join(app.getPath("temp"), "burrow-print-"));
+    fs.writeFileSync(path.join(folder, "picture.jpg"), Buffer.from(image, "base64"));
+    fs.writeFileSync(path.join(folder, "print.html"), "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><style>"
+      + `@page { margin: 0; size: ${landscape ? "landscape" : "portrait"}; } html, body { margin: 0; height: 100%; }`
+      + " img { display: block; width: 100%; height: 100%; object-fit: contain; }</style></head><body><img src=\"picture.jpg\"></body></html>");
+  }
+  catch (error) {
+    return;
+  }
+  const cleanUp = () => {
+    try {
+      fs.rmdirSync(folder, {recursive: true});
+    }
+    catch (error) {
+      // the temporary folder goes another time
+    }
+  };
+  const page = new BrowserWindow({show: false, webPreferences: {javascript: false, sandbox: true, contextIsolation: true}});
+  page.webContents.once("did-finish-load", () => {
+    page.webContents.print({silent: false, printBackground: true}, () => {
+      page.destroy();
+      cleanUp();
+    });
+  });
+  page.webContents.once("did-fail-load", () => {
+    page.destroy();
+    cleanUp();
+  });
+  page.loadFile(path.join(folder, "print.html"));
+});
+
 // a burrow:// link (above), once the login page is there to take it: only
 // the account page's nonce goes on, and the window comes to the front.
 const accountNonce = link => {

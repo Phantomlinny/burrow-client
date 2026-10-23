@@ -1288,6 +1288,10 @@
           else if (event.channel === "reportError") {
             reportError(event.args[0]);
           }
+          else if (event.channel === "printImage") {
+            // the game's print kits and art studios (game.html ajPrint)
+            window.client.printImage(event.args[0]);
+          }
           else if (event.channel === "openPage") {
             // main.js opens http and https addresses only
             window.client.openPage(String(event.args[0]));

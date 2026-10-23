@@ -26,6 +26,8 @@ contextBridge.exposeInMainWorld("client", {
   showFile: file => ipcRenderer.send("showFile", file),
   toggleFullscreen: () => ipcRenderer.send("toggleFullscreen"),
   openPage: url => ipcRenderer.send("openPage", url),
+  // a picture from the game to print (main.js): {image, width, height}
+  printImage: picture => ipcRenderer.send("printImage", picture),
   // the player's own theatre video file, which the game page may then load; "" when stopped.
   ownVideo: link => ipcRenderer.invoke("ownVideo", link),
   // Discord rich presence (discord.js): {appId, state, start, url}, or null.
