@@ -27,6 +27,8 @@ contextBridge.exposeInMainWorld("client", {
   // saves a picture of the game; resolves to the file's path, or null.
   screenshot: gameContentsId => ipcRenderer.invoke("screenshot", gameContentsId),
   showFile: file => ipcRenderer.send("showFile", file),
+  // the client's log file in its folder, to attach to a bug report (log.js)
+  showLog: () => ipcRenderer.send("showLog"),
   toggleFullscreen: () => ipcRenderer.send("toggleFullscreen"),
   openPage: url => ipcRenderer.send("openPage", url),
   // a picture from the game to print (main.js): {image, width, height}

@@ -5,6 +5,7 @@ const fs = require("fs");
 const path = require("path");
 const device = require("./device.js");
 const discord = require("./discord.js");
+const log = require("./log.js");
 const relay = require("./relay.js");
 const updater = require("./updater.js");
 
@@ -41,6 +42,7 @@ if (!app.requestSingleInstanceLock() && pendingLink) {
 // (boot.js), kept elsewhere; the plugin and build.json stay beside that one.
 const SHIPPED = global.burrow ? global.burrow.shipped : __dirname;
 const VERSION = require("./package.json").version;
+log.start(VERSION);
 
 // a packaged build names its server in build.json (tools/build.sh --server)
 const builtFor = () => {
@@ -515,6 +517,13 @@ ipcMain.on("showFile", (event, file) => {
   // only what the handler above wrote.
   if (path.dirname(String(file)) === path.join(app.getPath("pictures"), "Burrow")) {
     shell.showItemInFolder(String(file));
+  }
+});
+
+// the client's log (log.js), shown in its folder for a bug report
+ipcMain.on("showLog", event => {
+  if (win && event.sender === win.webContents && log.file()) {
+    shell.showItemInFolder(log.file());
   }
 });
 

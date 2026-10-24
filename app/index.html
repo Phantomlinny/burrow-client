@@ -371,7 +371,7 @@
             </label>
             <label class="check"><input id="new-remember" type="checkbox"> Remember me</label>
             <label class="check agree"><input id="new-agreed" type="checkbox">
-              <span>I am 16 or older, and old enough in my country to agree to this myself. I agree to the <a href="#" id="terms-signup">Terms of Service</a> and the <a href="#" id="privacy-signup">Privacy Policy</a>.</span></label>
+              <span>I am 18 or older, and old enough in my country to agree to this myself. I agree to the <a href="#" id="terms-signup">Terms of Service</a> and the <a href="#" id="privacy-signup">Privacy Policy</a>.</span></label>
             <button id="sign-up" class="main" type="submit">Create account</button>
           </div>
           <p id="signup-status" class="status" role="status"></p>
@@ -391,7 +391,7 @@
               <option value="4">Developer</option>
             </select>
           </label>
-          <label class="check"><input id="guide" type="checkbox" data-choice> Guide (client side)</label>
+          <label class="check"><input id="guide" type="checkbox" data-choice> Guide</label>
           <label>Starting room
             <input id="starting-room" type="text" spellcheck="false" placeholder="jamaa_township.room_main">
           </label>
@@ -402,6 +402,8 @@
           <label class="check"><input id="allow-unencrypted" type="checkbox"> Allow unencrypted</label>
           <label class="check" id="auto-update-part" hidden><input id="auto-update" type="checkbox"> Automatic updates</label>
           <p class="hint" id="version-hint"></p>
+          <button type="button" id="show-log">Show client log</button>
+          <p class="hint">Attach client.log to a bug report.</p>
         </details>
       </div>
     </main>
@@ -1651,6 +1653,7 @@
         }
       });
       $("auto-update").addEventListener("change", () => window.client.setAutoUpdate($("auto-update").checked));
+      $("show-log").addEventListener("click", () => window.client.showLog());
 
       window.client.info().then(result => {
         info = result;
